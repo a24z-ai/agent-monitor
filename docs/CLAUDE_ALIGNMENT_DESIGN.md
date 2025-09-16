@@ -11,7 +11,7 @@ Achieve comprehensive alignment with Claude's hook system while maintaining Open
 
 ## Milestones
 
-### Milestone 1: Core Event Mapping
+### Milestone 1: Core Event Mapping ✅ COMPLETED
 **Goal:** Map existing OpenCode events to Claude hook event names and structure
 
 #### Tasks
@@ -32,9 +32,9 @@ Achieve comprehensive alignment with Claude's hook system while maintaining Open
    - Add tool categorization (file ops, search, web, notebook, etc.)
 
 #### Deliverables
-- `src/types/claude-events.ts` - Complete type definitions
-- `src/constants/tools.ts` - Tool registry with categories
-- Updated `http-sender.ts` with new event structure
+- ✅ `src/types/claude-events.ts` - Complete type definitions
+- ✅ `src/constants/tools.ts` - Tool registry with categories
+- ✅ `src/opencode/claude-aligned-sender.ts` - Claude-aligned plugin implementation
 
 ---
 
@@ -144,9 +144,9 @@ Achieve comprehensive alignment with Claude's hook system while maintaining Open
 
 ## Implementation Priority
 
-### Phase 1 (Critical - Week 1)
-- Milestone 1: Core Event Mapping
-- Basic testing infrastructure
+### Phase 1 (Critical - Week 1) ✅ COMPLETED
+- ✅ Milestone 1: Core Event Mapping
+- ✅ Basic testing infrastructure (linting, type checking)
 
 ### Phase 2 (High - Week 2)
 - Milestone 2: Session Lifecycle Events

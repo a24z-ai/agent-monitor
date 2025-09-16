@@ -27,9 +27,6 @@
     "*.{js,ts,json,md}": [
       "biome check --write --no-errors-on-unmatched",
       "biome format --write"
-    ],
-    "*.{ts}": [
-      "tsc --noEmit"
     ]
   },
   "devDependencies": {

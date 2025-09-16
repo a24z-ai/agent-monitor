@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
 
 const sourceFile = path.join(__dirname, 'src', 'opencode', 'discovery.js');
 const pluginDir = path.join(os.homedir(), '.config', 'opencode', 'plugin');

@@ -6,7 +6,7 @@ const VSCODE_HOST = 'localhost';
 const ENDPOINT = `http://${VSCODE_HOST}:${VSCODE_PORT}/agent-monitor`;
 
 // Export as a named function for OpenCode plugin system
-export const AgentMonitorPlugin = async ({ project, client, $, directory, worktree }) => {
+export const AgentMonitorPlugin = async ({ project, directory, worktree }) => {
   console.log('[Agent Monitor] Plugin loaded, will send events to:', ENDPOINT);
 
   // Track session metrics

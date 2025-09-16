@@ -1,5 +1,31 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import http from 'http';
+import http from 'node:http';
+
+// Helper function to handle requests
+function handleRequest(body, res) {
+  try {
+    const event = JSON.parse(body);
+
+    // Simple test logic: block any tool containing 'dangerous'
+    if (event.type === 'tool.pre_execute') {
+      const shouldBlock = event.args?.command?.includes('dangerous') ?? false;
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          block: shouldBlock,
+          reason: shouldBlock ? 'Dangerous command detected' : undefined,
+        })
+      );
+    } else {
+      res.writeHead(200);
+      res.end('OK');
+    }
+  } catch (_error) {
+    res.writeHead(400);
+    res.end('Bad Request');
+  }
+}
 
 describe('HTTP Server Integration', () => {
   let server;
@@ -14,28 +40,7 @@ describe('HTTP Server Integration', () => {
           body += chunk.toString();
         });
         req.on('end', () => {
-          try {
-            const event = JSON.parse(body);
-
-            // Simple test logic: block any tool containing 'dangerous'
-            if (event.type === 'tool.pre_execute') {
-              const shouldBlock = event.args?.command?.includes('dangerous') ?? false;
-
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(
-                JSON.stringify({
-                  block: shouldBlock,
-                  reason: shouldBlock ? 'Dangerous command detected' : undefined,
-                })
-              );
-            } else {
-              res.writeHead(200);
-              res.end('OK');
-            }
-          } catch (error) {
-            res.writeHead(400);
-            res.end('Bad Request');
-          }
+          handleRequest(body, res);
         });
       } else {
         res.writeHead(404);

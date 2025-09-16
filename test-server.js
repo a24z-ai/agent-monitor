@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const http = require('http');
+const http = require('node:http');
 
 const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/agent-monitor') {

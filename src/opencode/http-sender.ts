@@ -33,13 +33,7 @@ interface MonitorResponse {
   reason?: string;
 }
 
-export const AgentMonitorPlugin: Plugin = async ({
-  project,
-  client,
-  $,
-  directory,
-  worktree,
-}: PluginInput) => {
+export const AgentMonitorPlugin: Plugin = async ({ project, directory, worktree }: PluginInput) => {
   console.log('[Agent Monitor] Plugin loaded, will send events to:', ENDPOINT);
 
   // Track session metrics
@@ -49,7 +43,10 @@ export const AgentMonitorPlugin: Plugin = async ({
     const event: EventPayload = {
       type: eventType,
       timestamp: Date.now(),
-      project: (project as any)?.name || 'unknown',
+      project:
+        typeof project === 'object' && project !== null && 'name' in project
+          ? String(project.name)
+          : 'unknown',
       directory,
       worktree,
       ...payload,
@@ -98,7 +95,8 @@ export const AgentMonitorPlugin: Plugin = async ({
           });
         }
 
-        const session = sessions.get(sessionID)!;
+        const session = sessions.get(sessionID);
+        if (!session) return;
         session.toolCallCount++;
         session.tools.add(tool);
 
@@ -168,7 +166,8 @@ export const AgentMonitorPlugin: Plugin = async ({
         if (event.type === 'session.idle') {
           const sessionID = event.properties?.sessionID as string;
           if (sessionID && sessions.has(sessionID)) {
-            const session = sessions.get(sessionID)!;
+            const session = sessions.get(sessionID);
+            if (!session) return;
 
             await sendEvent('session.idle', {
               sessionID,

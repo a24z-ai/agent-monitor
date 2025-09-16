@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 global.fetch = mock();
 
 describe('Agent Monitor Plugin', () => {
-  let mockProject, mockClient, mockShell, mockDirectory, mockWorktree;
+  let mockProject, mockDirectory, mockWorktree;
   let plugin;
 
   beforeEach(async () => {
@@ -13,8 +13,6 @@ describe('Agent Monitor Plugin', () => {
 
     // Setup mock context
     mockProject = { name: 'test-project' };
-    mockClient = {};
-    mockShell = {};
     mockDirectory = '/test/directory';
     mockWorktree = '/test/worktree';
 
@@ -22,8 +20,6 @@ describe('Agent Monitor Plugin', () => {
     const pluginModule = await import('../src/opencode/http-sender.ts');
     plugin = await pluginModule.AgentMonitorPlugin({
       project: mockProject,
-      client: mockClient,
-      $: mockShell,
       directory: mockDirectory,
       worktree: mockWorktree,
     });

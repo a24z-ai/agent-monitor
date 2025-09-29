@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": 1759093879854,
+  "tasks": {},
+  "byStatus": {
+    "pending": [],
+    "acknowledged": [],
+    "in_progress": [],
+    "completed": [],
+    "failed": []
+  },
+  "bySender": {},
+  "byADE": {}
+}

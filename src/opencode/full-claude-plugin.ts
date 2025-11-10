@@ -17,6 +17,7 @@ import type {
   ClaudePreToolUseEvent,
   ClaudeUserPromptSubmitEvent,
 } from '../types/claude-events';
+import { logger } from '../utils/logger';
 
 const VSCODE_PORT = 37123;
 const VSCODE_HOST = 'localhost';
@@ -35,7 +36,7 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
   directory,
   worktree,
 }: PluginInput) => {
-  console.log(
+  logger.log(
     '[Agent Monitor] Full Claude plugin loaded with user interactions, sending to:',
     ENDPOINT
   );
@@ -55,7 +56,7 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
   async function sendClaudeEventWithControl(
     event: Partial<ClaudeHookEvent>
   ): Promise<MonitorResponse> {
-    console.log('[Agent Monitor] Sending Claude event:', event.hook_event_name, {
+    logger.log('[Agent Monitor] Sending Claude event:', event.hook_event_name, {
       session: event.session_id,
       tool: 'tool_name' in event ? event.tool_name : undefined,
       prompt:
@@ -124,7 +125,7 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
 
       // Handle blocking
       if (control.block) {
-        console.log('[Agent Monitor] Prompt blocked:', control.reason);
+        logger.log('[Agent Monitor] Prompt blocked:', control.reason);
 
         // Create notification for blocked prompt
         interactionHandler.createNotification(
@@ -147,20 +148,20 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
 
       // Handle prompt modification
       if (control.modifiedPrompt) {
-        console.log('[Agent Monitor] Prompt modified');
+        logger.log('[Agent Monitor] Prompt modified');
         promptMetadata.modifiedPrompt = control.modifiedPrompt;
       }
 
       // Store context to inject
       if (control.contextToInject) {
         pendingContextInjections.set(sessionId, control.contextToInject);
-        console.log('[Agent Monitor] Context will be injected into response');
+        logger.log('[Agent Monitor] Context will be injected into response');
       }
 
       // Store system message
       if (control.systemMessage) {
         pendingSystemMessages.set(sessionId, control.systemMessage);
-        console.log('[Agent Monitor] System message will be added');
+        logger.log('[Agent Monitor] System message will be added');
       }
 
       // Check for prompt triggers that need notifications
@@ -185,7 +186,7 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
       // Return modified prompt or original
       return control.modifiedPrompt || prompt;
     } catch (error) {
-      console.error('[Agent Monitor] Failed to process user prompt:', error);
+      logger.error('[Agent Monitor] Failed to process user prompt:', error);
 
       // Create error notification
       interactionHandler.createNotification(
@@ -260,7 +261,7 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
             'Session idle warning',
             session.transcriptPath
           );
-          sendClaudeEvent(notifEvent).catch(console.error);
+          sendClaudeEvent(notifEvent).catch(logger.error);
         }
       }
     }, 5000);
@@ -347,13 +348,13 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
 
         // Inject context if provided
         if (control.contextToInject) {
-          console.log('[Agent Monitor] Context injected for tool:', tool);
+          logger.log('[Agent Monitor] Context injected for tool:', tool);
         }
 
         // Mark session as responding
         sessionManager.setResponding(sessionID, true);
       } catch (error) {
-        console.error('[Agent Monitor] Blocking tool call due to error:', error);
+        logger.error('[Agent Monitor] Blocking tool call due to error:', error);
         throw new Error(`Agent monitor check failed: ${(error as Error).message}`);
       }
     },
@@ -364,7 +365,7 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
       const session = sessionManager.getSession(sessionID);
 
       if (!session) {
-        console.warn('[Agent Monitor] Session not found for post-execute:', sessionID);
+        logger.warn('[Agent Monitor] Session not found for post-execute:', sessionID);
         return;
       }
 
@@ -372,7 +373,7 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
         // Apply context injection if pending
         const pendingContext = pendingContextInjections.get(sessionID);
         if (pendingContext) {
-          console.log('[Agent Monitor] Injecting context into tool response');
+          logger.log('[Agent Monitor] Injecting context into tool response');
           (output as any).contextInjected = pendingContext;
           pendingContextInjections.delete(sessionID);
         }
@@ -415,7 +416,7 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
           }
         }, 500);
       } catch (error) {
-        console.error('[Agent Monitor] Failed to send PostToolUse event:', error);
+        logger.error('[Agent Monitor] Failed to send PostToolUse event:', error);
       }
     },
 
@@ -476,7 +477,7 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
           }
         }
       } catch (error) {
-        console.error('[Agent Monitor] Failed to send session event:', error);
+        logger.error('[Agent Monitor] Failed to send session event:', error);
       }
     },
   };

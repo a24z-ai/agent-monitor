@@ -1,4 +1,5 @@
 import type { Plugin, PluginInput } from '@opencode-ai/plugin';
+import { logger } from '../utils/logger';
 
 const VSCODE_PORT = 37123;
 const VSCODE_HOST = 'localhost';
@@ -34,7 +35,7 @@ interface MonitorResponse {
 }
 
 export const AgentMonitorPlugin: Plugin = async ({ project, directory, worktree }: PluginInput) => {
-  console.log('[Agent Monitor] Plugin loaded, will send events to:', ENDPOINT);
+  logger.log('[Agent Monitor] Plugin loaded, will send events to:', ENDPOINT);
 
   // Track session metrics
   const sessions = new Map<string, SessionMetrics>();
@@ -53,7 +54,7 @@ export const AgentMonitorPlugin: Plugin = async ({ project, directory, worktree 
     };
 
     // Log the event locally
-    console.log('[Agent Monitor] Sending event:', eventType, {
+    logger.log('[Agent Monitor] Sending event:', eventType, {
       tool: payload.tool,
       sessionID: payload.sessionID,
     });
@@ -134,7 +135,7 @@ export const AgentMonitorPlugin: Plugin = async ({ project, directory, worktree 
         }
       } catch (error) {
         // If we can't reach the monitor or it rejects, block the tool call
-        console.error('[Agent Monitor] Blocking tool call due to error:', error);
+        logger.error('[Agent Monitor] Blocking tool call due to error:', error);
         throw new Error(`Agent monitor check failed: ${(error as Error).message}`);
       }
     },
@@ -156,7 +157,7 @@ export const AgentMonitorPlugin: Plugin = async ({ project, directory, worktree 
         });
       } catch (error) {
         // Post-execution monitoring failures shouldn't affect the tool result
-        console.error('[Agent Monitor] Failed to send post-execute event:', error);
+        logger.error('[Agent Monitor] Failed to send post-execute event:', error);
       }
     },
 
@@ -189,7 +190,7 @@ export const AgentMonitorPlugin: Plugin = async ({ project, directory, worktree 
         }
       } catch (error) {
         // Event monitoring failures are logged but don't throw
-        console.error('[Agent Monitor] Failed to send event:', error);
+        logger.error('[Agent Monitor] Failed to send event:', error);
       }
     },
   };

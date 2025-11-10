@@ -7,6 +7,7 @@ import type {
   ClaudeSessionEndEvent,
   ClaudeSessionStartEvent,
 } from '../types/claude-events';
+import { logger } from '../utils/logger';
 
 const VSCODE_PORT = 37123;
 const VSCODE_HOST = 'localhost';
@@ -34,7 +35,7 @@ export const ClaudeAlignedMonitorPlugin: Plugin = async ({
   directory,
   worktree,
 }: PluginInput) => {
-  console.log('[Agent Monitor] Claude-aligned plugin loaded, sending to:', ENDPOINT);
+  logger.log('[Agent Monitor] Claude-aligned plugin loaded, sending to:', ENDPOINT);
 
   // Track session metrics
   const sessions = new Map<string, SessionMetrics>();
@@ -44,7 +45,7 @@ export const ClaudeAlignedMonitorPlugin: Plugin = async ({
    */
   async function sendClaudeEvent(event: Partial<ClaudeHookEvent>): Promise<Response> {
     // Log the event locally
-    console.log('[Agent Monitor] Sending Claude event:', event.hook_event_name, {
+    logger.log('[Agent Monitor] Sending Claude event:', event.hook_event_name, {
       tool: 'tool_name' in event ? event.tool_name : undefined,
       session: event.session_id,
     });
@@ -234,11 +235,11 @@ export const ClaudeAlignedMonitorPlugin: Plugin = async ({
 
         // If context is provided, it could be logged or used
         if (result.context) {
-          console.log('[Agent Monitor] Context:', result.context);
+          logger.log('[Agent Monitor] Context:', result.context);
         }
       } catch (error) {
         // If we can't reach the monitor or it rejects, block the tool call
-        console.error('[Agent Monitor] Blocking tool call due to error:', error);
+        logger.error('[Agent Monitor] Blocking tool call due to error:', error);
         throw new Error(`Agent monitor check failed: ${(error as Error).message}`);
       }
     },
@@ -249,7 +250,7 @@ export const ClaudeAlignedMonitorPlugin: Plugin = async ({
       const session = sessions.get(sessionID);
 
       if (!session) {
-        console.warn('[Agent Monitor] Session not found for post-execute:', sessionID);
+        logger.warn('[Agent Monitor] Session not found for post-execute:', sessionID);
         return;
       }
 
@@ -273,7 +274,7 @@ export const ClaudeAlignedMonitorPlugin: Plugin = async ({
         await sendClaudeEvent(postToolEvent);
       } catch (error) {
         // Post-execution monitoring failures shouldn't affect the tool result
-        console.error('[Agent Monitor] Failed to send PostToolUse event:', error);
+        logger.error('[Agent Monitor] Failed to send PostToolUse event:', error);
       }
     },
 
@@ -290,7 +291,7 @@ export const ClaudeAlignedMonitorPlugin: Plugin = async ({
         // Note: session.resumed doesn't exist in OpenCode events
         // We'll handle session start through tool.execute.before instead
       } catch (error) {
-        console.error('[Agent Monitor] Failed to send session event:', error);
+        logger.error('[Agent Monitor] Failed to send session event:', error);
       }
     },
   };

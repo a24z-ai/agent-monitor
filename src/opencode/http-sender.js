@@ -1,13 +1,15 @@
 // Basic HTTP event sender for OpenCode plugin
 // Sends tool call events to VSCode extension endpoint
 
+const { logger } = require('../utils/logger');
+
 const VSCODE_PORT = 37123;
 const VSCODE_HOST = 'localhost';
 const ENDPOINT = `http://${VSCODE_HOST}:${VSCODE_PORT}/agent-monitor`;
 
 // Export as a named function for OpenCode plugin system
 export const AgentMonitorPlugin = async ({ project, directory, worktree }) => {
-  console.log('[Agent Monitor] Plugin loaded, will send events to:', ENDPOINT);
+  logger.log('[Agent Monitor] Plugin loaded, will send events to:', ENDPOINT);
 
   // Track session metrics
   const sessions = new Map();
@@ -23,7 +25,7 @@ export const AgentMonitorPlugin = async ({ project, directory, worktree }) => {
     };
 
     // Log the event locally
-    console.log('[Agent Monitor] Sending event:', eventType, {
+    logger.log('[Agent Monitor] Sending event:', eventType, {
       tool: payload.tool,
       sessionID: payload.sessionID,
     });
@@ -100,7 +102,7 @@ export const AgentMonitorPlugin = async ({ project, directory, worktree }) => {
         }
       } catch (error) {
         // If we can't reach the monitor or it rejects, block the tool call
-        console.error('[Agent Monitor] Blocking tool call due to error:', error.message);
+        logger.error('[Agent Monitor] Blocking tool call due to error:', error.message);
         throw new Error(`Agent monitor check failed: ${error.message}`);
       }
 
@@ -124,7 +126,7 @@ export const AgentMonitorPlugin = async ({ project, directory, worktree }) => {
         });
       } catch (error) {
         // Post-execution monitoring failures shouldn't affect the tool result
-        console.error('[Agent Monitor] Failed to send post-execute event:', error.message);
+        logger.error('[Agent Monitor] Failed to send post-execute event:', error.message);
       }
 
       return output;
@@ -158,7 +160,7 @@ export const AgentMonitorPlugin = async ({ project, directory, worktree }) => {
         }
       } catch (error) {
         // Event monitoring failures are logged but don't throw
-        console.error('[Agent Monitor] Failed to send event:', error.message);
+        logger.error('[Agent Monitor] Failed to send event:', error.message);
       }
     },
   };

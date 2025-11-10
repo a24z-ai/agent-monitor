@@ -11,6 +11,7 @@ import type {
   ClaudePostToolUseEvent,
   ClaudePreToolUseEvent,
 } from '../types/claude-events';
+import { logger } from '../utils/logger';
 
 const VSCODE_PORT = 37123;
 const VSCODE_HOST = 'localhost';
@@ -30,7 +31,7 @@ export const EnhancedClaudeMonitorPlugin: Plugin = async ({
   directory,
   worktree,
 }: PluginInput) => {
-  console.log('[Agent Monitor] Enhanced Claude plugin loaded, sending to:', ENDPOINT);
+  logger.log('[Agent Monitor] Enhanced Claude plugin loaded, sending to:', ENDPOINT);
 
   // Initialize session manager
   const sessionManager = new SessionManager(directory, `${directory}/.opencode/transcripts`);
@@ -48,7 +49,7 @@ export const EnhancedClaudeMonitorPlugin: Plugin = async ({
    * Send Claude-formatted event to monitor
    */
   async function sendClaudeEvent(event: Partial<ClaudeHookEvent>): Promise<Response> {
-    console.log('[Agent Monitor] Sending Claude event:', event.hook_event_name, {
+    logger.log('[Agent Monitor] Sending Claude event:', event.hook_event_name, {
       session: event.session_id,
       tool: 'tool_name' in event ? event.tool_name : undefined,
     });
@@ -91,12 +92,12 @@ export const EnhancedClaudeMonitorPlugin: Plugin = async ({
       try {
         const stopEvent = sessionManager.buildStopEvent(sessionId);
         await sendClaudeEvent(stopEvent);
-        console.log('[Agent Monitor] Stop event sent for session:', sessionId);
+        logger.log('[Agent Monitor] Stop event sent for session:', sessionId);
 
         // Reset stop hook flag
         session.stopHookActive = false;
       } catch (error) {
-        console.error('[Agent Monitor] Failed to send Stop event:', error);
+        logger.error('[Agent Monitor] Failed to send Stop event:', error);
       }
     }
   }
@@ -112,12 +113,12 @@ export const EnhancedClaudeMonitorPlugin: Plugin = async ({
       try {
         const subagentStopEvent = sessionManager.buildSubagentStopEvent(sessionId);
         await sendClaudeEvent(subagentStopEvent);
-        console.log('[Agent Monitor] SubagentStop event sent for session:', sessionId);
+        logger.log('[Agent Monitor] SubagentStop event sent for session:', sessionId);
 
         // Reset subagent stop flag
         session.subagentStopHookActive = false;
       } catch (error) {
-        console.error('[Agent Monitor] Failed to send SubagentStop event:', error);
+        logger.error('[Agent Monitor] Failed to send SubagentStop event:', error);
       }
     }
   }
@@ -198,7 +199,7 @@ export const EnhancedClaudeMonitorPlugin: Plugin = async ({
    * Handle installation updated event
    */
   async function handleInstallationUpdated(): Promise<void> {
-    console.log('[Agent Monitor] Installation updated, clearing sessions');
+    logger.log('[Agent Monitor] Installation updated, clearing sessions');
     for (const session of sessionManager.getActiveSessions()) {
       sessionManager.endSession(session.sessionId, 'installation_updated');
     }
@@ -281,13 +282,13 @@ export const EnhancedClaudeMonitorPlugin: Plugin = async ({
         }
 
         if (result.context) {
-          console.log('[Agent Monitor] Context:', result.context);
+          logger.log('[Agent Monitor] Context:', result.context);
         }
 
         // Mark session as responding (agent is active)
         sessionManager.setResponding(sessionID, true);
       } catch (error) {
-        console.error('[Agent Monitor] Blocking tool call due to error:', error);
+        logger.error('[Agent Monitor] Blocking tool call due to error:', error);
         throw new Error(`Agent monitor check failed: ${(error as Error).message}`);
       }
     },
@@ -298,7 +299,7 @@ export const EnhancedClaudeMonitorPlugin: Plugin = async ({
       const session = sessionManager.getSession(sessionID);
 
       if (!session) {
-        console.warn('[Agent Monitor] Session not found for post-execute:', sessionID);
+        logger.warn('[Agent Monitor] Session not found for post-execute:', sessionID);
         return;
       }
 
@@ -336,7 +337,7 @@ export const EnhancedClaudeMonitorPlugin: Plugin = async ({
           await checkAndSendStopEvent(sessionID);
         }, 500);
       } catch (error) {
-        console.error('[Agent Monitor] Failed to send PostToolUse event:', error);
+        logger.error('[Agent Monitor] Failed to send PostToolUse event:', error);
       }
     },
 
@@ -373,7 +374,7 @@ export const EnhancedClaudeMonitorPlugin: Plugin = async ({
       try {
         await handleSessionEvent(event);
       } catch (error) {
-        console.error('[Agent Monitor] Failed to send session event:', error);
+        logger.error('[Agent Monitor] Failed to send session event:', error);
       }
     },
   };

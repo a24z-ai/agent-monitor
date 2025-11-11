@@ -6,7 +6,7 @@ const os = require('node:os');
 
 // Plugin configuration
 const PLUGIN_NAME = 'agent-monitor.js';
-const SOURCE_FILE = path.join(__dirname, 'src', 'opencode', 'http-sender.ts');
+const SOURCE_FILE = path.join(__dirname, 'dist', 'full-claude-plugin.js');
 
 // Determine installation directory
 const globalPluginDir = path.join(os.homedir(), '.config', 'opencode', 'plugin');
@@ -30,11 +30,11 @@ function install(isGlobal = true) {
     console.log(`📍 Location: ${targetFile}`);
     console.log('');
     console.log('The plugin will:');
-    console.log('  • Send tool call events to http://localhost:37123/agent-monitor');
-    console.log('  • Block tool execution if the monitor service is unreachable');
+    console.log('  • Send tool call events to http://localhost:3043/opencode-hook');
+    console.log('  • Fail silently if the monitor service is unreachable');
     console.log('  • Block tools if the monitor responds with {block: true}');
     console.log('');
-    console.log('⚠️  Make sure your VSCode extension is listening on port 37123');
+    console.log('⚠️  Make sure the electron-app is running to receive events');
   } catch (error) {
     console.error('❌ Installation failed:', error.message);
     process.exit(1);

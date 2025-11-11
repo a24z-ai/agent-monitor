@@ -206,39 +206,55 @@ export const EnhancedClaudeMonitorPlugin: Plugin = async ({
   }
 
   /**
+   * Sanitize sensitive tool arguments
+   */
+  function sanitizeSensitiveArgs(args: Record<string, unknown>) {
+    return {
+      _sanitized: true,
+      param_count: Object.keys(args).length,
+      param_types: Object.keys(args).reduce(
+        (acc, key) => {
+          acc[key] = typeof args[key];
+          return acc;
+        },
+        {} as Record<string, string>
+      ),
+    };
+  }
+
+  /**
+   * Sanitize a single argument value
+   */
+  function sanitizeArgValue(key: string, value: unknown): unknown {
+    if (key === 'command' && typeof value === 'string') {
+      return value.substring(0, 100);
+    }
+    if (key === 'pattern' || key === 'glob' || key === 'path') {
+      return value;
+    }
+    if (typeof value === 'string' && value.length > 200) {
+      return `${value.substring(0, 200)}... [truncated]`;
+    }
+    if (typeof value === 'object') {
+      return '[object]';
+    }
+    return value;
+  }
+
+  /**
    * Sanitize tool input based on sensitivity
    */
   function sanitizeToolInput(toolName: string, args: Record<string, unknown>): unknown {
     const metadata = getToolMetadata(toolName);
 
     if (metadata?.sensitive) {
-      return {
-        _sanitized: true,
-        param_count: Object.keys(args).length,
-        param_types: Object.keys(args).reduce(
-          (acc, key) => {
-            acc[key] = typeof args[key];
-            return acc;
-          },
-          {} as Record<string, string>
-        ),
-      };
+      return sanitizeSensitiveArgs(args);
     }
 
     // For non-sensitive tools, include more details
     const safeArgs: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(args)) {
-      if (key === 'command' && typeof value === 'string') {
-        safeArgs[key] = value.substring(0, 100);
-      } else if (key === 'pattern' || key === 'glob' || key === 'path') {
-        safeArgs[key] = value;
-      } else if (typeof value === 'string' && value.length > 200) {
-        safeArgs[key] = `${value.substring(0, 200)}... [truncated]`;
-      } else if (typeof value === 'object') {
-        safeArgs[key] = '[object]';
-      } else {
-        safeArgs[key] = value;
-      }
+      safeArgs[key] = sanitizeArgValue(key, value);
     }
     return safeArgs;
   }

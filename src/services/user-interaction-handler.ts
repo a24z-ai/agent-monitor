@@ -74,7 +74,7 @@ export class UserInteractionHandler {
 
   constructor(
     private readonly cwd: string,
-    private readonly transcriptBasePath: string
+    readonly _transcriptBasePath: string
   ) {}
 
   /**

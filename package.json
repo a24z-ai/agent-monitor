@@ -7,6 +7,9 @@
     "agent-monitor": "./install.js"
   },
   "scripts": {
+    "build": "bun build src/opencode/full-claude-plugin.ts --outdir dist --target node --format esm",
+    "build:watch": "bun build src/opencode/full-claude-plugin.ts --outdir dist --target node --format esm --watch",
+    "build:install": "npm run build && npm run install-local",
     "install-plugin": "node install.js install",
     "uninstall-plugin": "node install.js uninstall",
     "install-local": "node install.js install --local",

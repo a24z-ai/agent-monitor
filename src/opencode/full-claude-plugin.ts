@@ -19,9 +19,9 @@ import type {
 } from '../types/claude-events';
 import { logger } from '../utils/logger';
 
-const VSCODE_PORT = 37123;
+const VSCODE_PORT = 3043;
 const VSCODE_HOST = 'localhost';
-const ENDPOINT = `http://${VSCODE_HOST}:${VSCODE_PORT}/agent-monitor`;
+const ENDPOINT = `http://${VSCODE_HOST}:${VSCODE_PORT}/opencode-hook`;
 
 interface MonitorResponse extends ResponseControl {
   // ResponseControl includes: block, reason, modifiedPrompt, contextToInject, suppressOutput, systemMessage
@@ -35,6 +35,8 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
   project,
   directory,
   worktree,
+  client,
+  $,
 }: PluginInput) => {
   logger.log(
     '[Agent Monitor] Full Claude plugin loaded with user interactions, sending to:',
@@ -65,32 +67,38 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
           : undefined,
     });
 
-    const response = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...event,
-        _opencode_meta: {
-          project:
-            typeof project === 'object' && project !== null && 'name' in project
-              ? String(project.name)
-              : 'unknown',
-          directory,
-          worktree,
-          timestamp: Date.now(),
+    try {
+      const response = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      }),
-    });
+        body: JSON.stringify({
+          ...event,
+          _opencode_meta: {
+            project:
+              typeof project === 'object' && project !== null && 'name' in project
+                ? String(project.name)
+                : 'unknown',
+            directory,
+            worktree,
+            timestamp: Date.now(),
+          },
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to send event: ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Failed to send event: ${response.status} ${response.statusText}`);
+      }
+
+      // Parse response for control instructions
+      const control = (await response.json()) as MonitorResponse;
+      return control;
+    } catch (error) {
+      // If monitor server is unreachable, fail silently and allow operation
+      logger.warn('[Agent Monitor] Monitor server unreachable, allowing operation:', error);
+      return { block: false };
     }
-
-    // Parse response for control instructions
-    const control = (await response.json()) as MonitorResponse;
-    return control;
   }
 
   /**
@@ -98,6 +106,78 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
    */
   async function sendClaudeEvent(event: Partial<ClaudeHookEvent>): Promise<void> {
     await sendClaudeEventWithControl(event);
+  }
+
+  /**
+   * Handle blocked prompt notification
+   */
+  async function handleBlockedPrompt(
+    sessionId: string,
+    reason: string | undefined,
+    transcriptPath: string
+  ): Promise<null> {
+    logger.log('[Agent Monitor] Prompt blocked:', reason);
+
+    interactionHandler.createNotification(
+      sessionId,
+      NotificationType.TOOL_BLOCKED,
+      reason || 'Prompt was blocked by monitor',
+      'warning'
+    );
+
+    const notifEvent = interactionHandler.buildNotificationEvent(
+      sessionId,
+      `Prompt blocked: ${reason}`,
+      transcriptPath
+    );
+    await sendClaudeEvent(notifEvent);
+
+    return null;
+  }
+
+  /**
+   * Handle prompt triggers and send notifications
+   */
+  async function handlePromptTriggers(
+    sessionId: string,
+    prompt: string,
+    transcriptPath: string
+  ): Promise<void> {
+    const triggerType = interactionHandler.checkPromptTriggers(prompt);
+    if (!triggerType) {
+      return;
+    }
+
+    const notification = interactionHandler.createNotification(
+      sessionId,
+      triggerType,
+      `Prompt triggered ${triggerType} notification`,
+      triggerType === NotificationType.PERMISSION_NEEDED ? 'warning' : 'info'
+    );
+
+    const notifEvent = interactionHandler.buildNotificationEvent(
+      sessionId,
+      notification.message,
+      transcriptPath
+    );
+    await sendClaudeEvent(notifEvent);
+  }
+
+  /**
+   * Handle user prompt error
+   */
+  function handlePromptError(sessionId: string, error: unknown): string {
+    logger.error('[Agent Monitor] Failed to process user prompt:', error);
+
+    interactionHandler.createNotification(
+      sessionId,
+      NotificationType.ERROR_OCCURRED,
+      `Failed to process prompt: ${(error as Error).message}`,
+      'error'
+    );
+
+    // Allow prompt to proceed on error (fail open)
+    return '';
   }
 
   /**
@@ -125,25 +205,7 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
 
       // Handle blocking
       if (control.block) {
-        logger.log('[Agent Monitor] Prompt blocked:', control.reason);
-
-        // Create notification for blocked prompt
-        interactionHandler.createNotification(
-          sessionId,
-          NotificationType.TOOL_BLOCKED,
-          control.reason || 'Prompt was blocked by monitor',
-          'warning'
-        );
-
-        // Send notification event
-        const notifEvent = interactionHandler.buildNotificationEvent(
-          sessionId,
-          `Prompt blocked: ${control.reason}`,
-          session.transcriptPath
-        );
-        await sendClaudeEvent(notifEvent);
-
-        return null; // Block the prompt
+        return await handleBlockedPrompt(sessionId, control.reason, session.transcriptPath);
       }
 
       // Handle prompt modification
@@ -165,40 +227,50 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
       }
 
       // Check for prompt triggers that need notifications
-      const triggerType = interactionHandler.checkPromptTriggers(prompt);
-      if (triggerType) {
-        const notification = interactionHandler.createNotification(
-          sessionId,
-          triggerType,
-          `Prompt triggered ${triggerType} notification`,
-          triggerType === NotificationType.PERMISSION_NEEDED ? 'warning' : 'info'
-        );
-
-        // Send notification event
-        const notifEvent = interactionHandler.buildNotificationEvent(
-          sessionId,
-          notification.message,
-          session.transcriptPath
-        );
-        await sendClaudeEvent(notifEvent);
-      }
+      await handlePromptTriggers(sessionId, prompt, session.transcriptPath);
 
       // Return modified prompt or original
       return control.modifiedPrompt || prompt;
     } catch (error) {
-      logger.error('[Agent Monitor] Failed to process user prompt:', error);
-
-      // Create error notification
-      interactionHandler.createNotification(
-        sessionId,
-        NotificationType.ERROR_OCCURRED,
-        `Failed to process prompt: ${(error as Error).message}`,
-        'error'
-      );
-
-      // Allow prompt to proceed on error (fail open)
+      handlePromptError(sessionId, error);
       return prompt;
     }
+  }
+
+  /**
+   * Sanitize sensitive tool arguments
+   */
+  function sanitizeSensitiveArgs(args: Record<string, unknown>) {
+    return {
+      _sanitized: true,
+      param_count: Object.keys(args).length,
+      param_types: Object.keys(args).reduce(
+        (acc, key) => {
+          acc[key] = typeof args[key];
+          return acc;
+        },
+        {} as Record<string, string>
+      ),
+    };
+  }
+
+  /**
+   * Sanitize a single argument value
+   */
+  function sanitizeArgValue(key: string, value: unknown): unknown {
+    if (key === 'command' && typeof value === 'string') {
+      return value.substring(0, 100);
+    }
+    if (key === 'pattern' || key === 'glob' || key === 'path') {
+      return value;
+    }
+    if (typeof value === 'string' && value.length > 200) {
+      return `${value.substring(0, 200)}... [truncated]`;
+    }
+    if (typeof value === 'object') {
+      return '[object]';
+    }
+    return value;
   }
 
   /**
@@ -208,33 +280,13 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
     const metadata = getToolMetadata(toolName);
 
     if (metadata?.sensitive) {
-      return {
-        _sanitized: true,
-        param_count: Object.keys(args).length,
-        param_types: Object.keys(args).reduce(
-          (acc, key) => {
-            acc[key] = typeof args[key];
-            return acc;
-          },
-          {} as Record<string, string>
-        ),
-      };
+      return sanitizeSensitiveArgs(args);
     }
 
     // For non-sensitive tools
     const safeArgs: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(args)) {
-      if (key === 'command' && typeof value === 'string') {
-        safeArgs[key] = value.substring(0, 100);
-      } else if (key === 'pattern' || key === 'glob' || key === 'path') {
-        safeArgs[key] = value;
-      } else if (typeof value === 'string' && value.length > 200) {
-        safeArgs[key] = `${value.substring(0, 200)}... [truncated]`;
-      } else if (typeof value === 'object') {
-        safeArgs[key] = '[object]';
-      } else {
-        safeArgs[key] = value;
-      }
+      safeArgs[key] = sanitizeArgValue(key, value);
     }
     return safeArgs;
   }
@@ -308,14 +360,14 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
       const { args } = output;
 
       try {
-        // Initialize or get session
+        // Get or lazily initialize session (should already exist from session.updated event)
         let session = sessionManager.getSession(sessionID);
         if (!session) {
+          // Fallback: initialize if session.updated didn't fire yet
           session = sessionManager.initSession(sessionID, 'startup');
-
-          // Send SessionStart event
           const sessionStartEvent = sessionManager.buildSessionStartEvent(sessionID);
           await sendClaudeEvent(sessionStartEvent);
+          logger.warn('[Agent Monitor] Session initialized in fallback mode:', sessionID);
         }
 
         // Track tool start
@@ -354,8 +406,13 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
         // Mark session as responding
         sessionManager.setResponding(sessionID, true);
       } catch (error) {
-        logger.error('[Agent Monitor] Blocking tool call due to error:', error);
-        throw new Error(`Agent monitor check failed: ${(error as Error).message}`);
+        // Only re-throw if it's an intentional block error
+        // Connection errors are already handled in sendClaudeEventWithControl
+        if ((error as Error).message?.includes('blocked by agent monitor')) {
+          throw error;
+        }
+        // For other errors, log and allow the tool to proceed
+        logger.warn('[Agent Monitor] Error in tool pre-execution, allowing tool:', error);
       }
     },
 
@@ -423,8 +480,39 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
     // Monitor session lifecycle
     event: async ({ event }) => {
       try {
-        if (event.type === 'session.idle') {
+        if (event.type === 'session.updated') {
+          // session.updated fires when session is created or modified
+          const sessionInfo = event.properties.info;
+          const sessionID = sessionInfo?.id;
+
+          if (sessionID) {
+            // Check if this is a new session
+            const existingSession = sessionManager.getSession(sessionID);
+            if (!existingSession) {
+              // New session - initialize and send SessionStart
+              sessionManager.initSession(sessionID, 'startup');
+              const sessionStartEvent = sessionManager.buildSessionStartEvent(sessionID);
+              await sendClaudeEvent(sessionStartEvent);
+
+              logger.log('[Agent Monitor] New session created:', sessionID);
+            }
+          }
+        } else if (event.type === 'session.idle') {
           const sessionID = event.properties.sessionID;
+          const session = sessionManager.getSession(sessionID);
+
+          if (session) {
+            // session.idle means agent stopped responding, send Stop event
+            sessionManager.setResponding(sessionID, false);
+            const stopEvent = sessionManager.buildStopEvent(sessionID);
+            await sendClaudeEvent(stopEvent);
+
+            logger.log('[Agent Monitor] Agent stopped responding (session.idle)');
+          }
+        } else if (event.type === 'session.deleted') {
+          // session.deleted fires when user closes OpenCode or session ends
+          const sessionInfo = event.properties.info;
+          const sessionID = sessionInfo?.id || 'unknown';
           const session = sessionManager.getSession(sessionID);
 
           if (session) {
@@ -434,19 +522,13 @@ export const FullClaudeMonitorPlugin: Plugin = async ({
 
             // Get session stats for final notification
             const stats = interactionHandler.getSessionStats(sessionID);
-
-            // Create session summary notification
-            const summaryMessage = `Session ended: ${stats.totalPrompts} prompts, ${stats.blockedPrompts} blocked`;
-            interactionHandler.createNotification(
-              sessionID,
-              NotificationType.SESSION_UPDATE,
-              summaryMessage,
-              'info'
-            );
+            const _summaryMessage = `Session ended: ${stats.totalPrompts} prompts, ${stats.blockedPrompts} blocked`;
 
             // Clean up
-            sessionManager.endSession(sessionID, 'idle');
+            sessionManager.endSession(sessionID, 'deleted');
             interactionHandler.clearSession(sessionID);
+
+            logger.log('[Agent Monitor] Session deleted (session.deleted)');
           }
         } else if (event.type === 'session.error') {
           const sessionID = event.properties.sessionID || 'unknown';

@@ -1,0 +1,12 @@
+# Bun configuration for agent-monitor tests
+
+[test]
+# Preload setup file before all tests
+preload = ["./test/setup.ts"]
+
+# Set timeout for tests (some integration tests need longer)
+timeout = 30000
+
+# Coverage settings
+coverage = true
+coverageThreshold = 0

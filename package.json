@@ -1,11 +1,17 @@
 {
   "name": "agent-monitor",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "OpenCode plugin for monitoring and controlling agent tool calls",
   "main": "src/opencode/http-sender.ts",
   "bin": {
     "agent-monitor": "./install.js"
   },
+  "files": [
+    "dist/",
+    "src/",
+    "install.js",
+    "README.md"
+  ],
   "scripts": {
     "build": "bun build src/opencode/full-claude-plugin.ts --outdir dist --target node --format esm",
     "build:watch": "bun build src/opencode/full-claude-plugin.ts --outdir dist --target node --format esm --watch",
